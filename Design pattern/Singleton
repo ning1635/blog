@@ -1,0 +1,74 @@
+先看一个单例模式
+public final class EagerSingleton 
+{ 
+    private static EagerSingleton singObj = new EagerSingleton(); 
+    private EagerSingleton(){ 
+    } 
+ 
+    public static EagerSingleton getSingleInstance(){ 
+       return singObj;
+    } 
+} 
+这就是所谓的饿汉模式，每个对象在没有使用之前就已经初始化了。这就可能带来潜在的性能问题：若这个对象很大呢？没有使用这个对象之前，就把它加载到了内存中去是一种巨大的浪费。针对这种情况可对以上的代码进行改进，使用一种新的设计思想——延迟加载。
+public final class LazySingleton 
+{ 
+    private static LazySingleton singObj = null; 
+ 
+    private LazySingleton(){ 
+    } 
+ 
+    public static LazySingleton getSingleInstance(){ 
+        if(null == singObj) singObj = new LazySingleton();
+          return singObj;
+    } 
+} 
+这就是所谓的懒汉模式。它使用了延迟加载来保证对象在没有使用之前，是不会进行初始化的。这种写法线程不安全。这是因为在多个线程可能同时运行到if(null == singObj)，判断singObj为null，于是同时进行了初始化。所以面临问题是如何使得代码线程安全？加上synchronized即可。
+public final class ThreadSafeSingleton 
+{ 
+    private static ThreadSafeSingleton singObj = null; 
+ 
+    private ThreadSafeSingleton(){ 
+    } 
+ 
+    public static Synchronized ThreadSafeSingleton getSingleInstance(){ 
+        if(null == singObj ) singObj = new ThreadSafeSingleton();
+            return singObj;
+    } 
+} 
+这个写法会带来性能问题。同步的代价必然会一定程度的使程序的并发度降低。有没有方法一方面是线程安全的，另一方面有很高的并发度呢？
+我们观察到线程不安全的原因其实是在初始化对象时，所以可想办法把同步的粒度降低，只在初始化对象的时候进行同步。这里有必要提出一种新的设计思想——双重检查锁（Double-Checked Lock）。
+public final class DoubleCheckedSingleton 
+{ 
+    private static DoubleCheckedSingletonsingObj = null; 
+ 
+    private DoubleCheckedSingleton(){ 
+    } 
+ 
+    public static DoubleCheckedSingleton getSingleInstance(){ 
+       if(null == singObj ) {
+             Synchronized(DoubleCheckedSingleton.class){
+                    if(null == singObj)
+                          singObj = new DoubleCheckedSingleton();
+             }
+       }
+       return singObj;
+    } 
+} 
+这种写法使得只有在加载新对象进行同步，在加载完了之后其他线程在第九行就可以判断跳过锁的的代价直接到第15行代码了。做到很好的并发度。
+
+上面的写法一方面实现了Lazy-Load，另一个方面也做到了并发度很好的线程安全，一切看上很完美。其实这种写法还是有问题的！问题在哪里？假设线程A执行到了第9行，它判断对象为空，于是线程A执行到第12行去初始化这个对象，但初始化是需要耗费时间的，但是这个对象的地址其实已经存在了。此时线程B也执行到了第九行，它判断不为空，于是直接跳到15行得到了这个对象。但是，这个对象还没有被完整的初始化！得到一个没有初始化完全的对象有什么用！关于这个Double-Checked Lock的讨论有很多，目前公认这是一个Anti-Pattern，不推荐使用！
+ 
+这里又要提出一种新的模式——Initialization on Demand Holder. 这种方法使用内部类来做到延迟加载对象，在初始化这个内部类的时候，JLS(Java Language Sepcification)会保证这个类的线程安全。这种写法完全使用了Java虚拟机的机制进行同步保证，没有一个同步的关键字。这种方式是Singleton类被装载了，instance不一定被初始化，因为SingletonHolder类没有被主动使用。只有显示通过调用getInstance方法时，才会显示装载SingletonHolder类，从而实例化instance。
+
+public class Singleton   
+{   
+    private static class SingletonHolder   
+    {   
+        public final static Singleton instance = new Singleton();   
+    }   
+  
+    public static Singleton getInstance()   
+    {   
+        return SingletonHolder.instance;   
+    }   
+}
