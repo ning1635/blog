@@ -72,3 +72,4 @@ public class Singleton
         return SingletonHolder.instance;   
     }   
 }
+
